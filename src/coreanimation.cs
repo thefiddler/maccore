@@ -873,6 +873,7 @@ namespace MonoMac.CoreAnimation {
 	
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[IsWrapperType (false)]
 	public interface CAAnimationDelegate {
 		[Export ("animationDidStart:")]
 		void AnimationStarted (CAAnimation anim);
