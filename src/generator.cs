@@ -196,6 +196,21 @@ public static class ReflectionExtensions {
 	}
 }
 
+// Used to mark if a type is a wrapper type or not
+// (by default types are wrapper types).
+public class IsWrapperTypeAttribute : Attribute {
+	public IsWrapperTypeAttribute (bool isWrapperType)
+	{
+		IsWrapperType = isWrapperType;
+	}
+
+	public bool IsWrapperType { get; set; }
+}
+
+// Used to mark if a type is wrapping a protocol
+public class IsProtocolAttrbute : Attribute {
+}
+
 public class NeedsAuditAttribute : Attribute {
 	public NeedsAuditAttribute (string reason)
 	{
@@ -3042,7 +3057,13 @@ public class Generator {
 			print ("}\n");
 		}
 	}
-	
+
+	public bool IsWrapperType (Type type)
+	{
+		var attr = GetAttribute<IsWrapperTypeAttribute> (type);
+		return attr == null || attr.IsWrapperType;
+	}
+
 	public void Generate (Type type)
 	{
 		type_wants_zero_copy = HasAttribute (type, typeof (ZeroCopyStringsAttribute)) || ZeroCopyStrings;
@@ -3083,7 +3104,7 @@ public class Generator {
 				base_type = typeof (object);
 				class_mod = "static ";
 			} else {
-				print ("[Register(\"{0}\", true)]", objc_type_name);
+				print ("[Register(\"{0}\", {1})]", objc_type_name, IsWrapperType (type) ? "true" : "false");
 				if (need_abstract.ContainsKey (type))
 					class_mod = "abstract ";
 			} 
