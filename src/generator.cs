@@ -2932,12 +2932,14 @@ public class Generator {
 				selector = ba.Selector;
 				virtual_method = ba.Virtual;
 			}
-		} else if (!is_sealed) {
+		} else {
 			ExportAttribute ea = (ExportAttribute) attr [0];
 			selector = ea.Selector;
 					
-			print ("[Export (\"{0}\")]", ea.Selector);
-			virtual_method = mi.Name != "Constructor";
+			if (!is_sealed) {
+				print ("[Export (\"{0}\")]", ea.Selector);
+				virtual_method = mi.Name != "Constructor";
+			}
 		}
 
 		foreach (ObsoleteAttribute oa in mi.GetCustomAttributes (typeof (ObsoleteAttribute), false)) {
