@@ -2720,6 +2720,7 @@ public class Generator {
 		bool is_override = HasAttribute (pi, typeof (OverrideAttribute)) || !MemberBelongsToType (pi.DeclaringType,  type);
 		bool is_new = HasAttribute (pi, typeof (NewAttribute));
 		bool is_sealed = HasAttribute (pi, typeof (SealedAttribute));
+		bool is_wrapper = IsWrappedType (pi.DeclaringType);
 		bool is_unsafe = false;
 		
 		if (pi.PropertyType.IsSubclassOf (typeof (Delegate)))
@@ -2823,7 +2824,7 @@ public class Generator {
 			var ba = GetBindAttribute (getter);
 			string sel = ba != null ? ba.Selector : export.Selector;
 
-			if (!is_sealed) {
+			if (!is_sealed || !is_wrapper) {
 				if (export.ArgumentSemantic != ArgumentSemantic.None)
 					print ("[Export (\"{0}\", ArgumentSemantic.{1})]", sel, export.ArgumentSemantic);
 				else
@@ -2866,7 +2867,7 @@ public class Generator {
 				sel = ba.Selector;
 			}
 
-			if (!not_implemented && !is_sealed){
+			if (!not_implemented && (!is_sealed || !is_wrapper)){
 				if (export.ArgumentSemantic != ArgumentSemantic.None)
 					print ("[Export (\"{0}\", ArgumentSemantic.{1})]", sel, export.ArgumentSemantic);
 				else
@@ -2915,6 +2916,7 @@ public class Generator {
 			}
 		
 		bool is_sealed = HasAttribute (mi, typeof (SealedAttribute));
+		bool is_wrapper = IsWrappedType (type);
 		string selector = null;
 		bool virtual_method = false;
 		string wrap_method = null;
@@ -2936,7 +2938,7 @@ public class Generator {
 			ExportAttribute ea = (ExportAttribute) attr [0];
 			selector = ea.Selector;
 					
-			if (!is_sealed) {
+			if (!is_sealed || !is_wrapper) {
 				print ("[Export (\"{0}\")]", ea.Selector);
 				virtual_method = mi.Name != "Constructor";
 			}
