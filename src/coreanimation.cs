@@ -730,6 +730,7 @@ namespace MonoMac.CoreAnimation {
 
 	[BaseType (typeof (NSObject))]
 	[Model]
+	[Protocol]
 	public interface CALayerDelegate {
 		[Export ("displayLayer:")]
 		void DisplayLayer (CALayer layer);
@@ -758,7 +759,7 @@ namespace MonoMac.CoreAnimation {
 
 	[BaseType (typeof (NSObject))]
 	[Model]
-	// protocol
+	[Protocol]
 	[DisableDefaultCtor]
 	public interface CAAction {
 		[Export ("runActionForKey:object:arguments:")]

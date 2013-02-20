@@ -8,7 +8,7 @@
 //   Marek Safar (marek.safar@gmail.com)
 //
 // Copyright 2009-2010, Novell, Inc.
-// Copyright 2011-2012 Xamarin, Inc.
+// Copyright 2011-2013 Xamarin, Inc.
 //
 //
 // This generator produces various */*.g.cs files based on the
@@ -208,7 +208,7 @@ public class IsWrapperTypeAttribute : Attribute {
 }
 
 // Used to mark if a type is wrapping a protocol
-public class IsProtocolAttrbute : Attribute {
+public class ProtocolAttribute : Attribute {
 }
 
 public class NeedsAuditAttribute : Attribute {
@@ -3095,6 +3095,7 @@ public class Generator {
 			bool is_category_class = category_attribute.Length > 0;
 			bool is_static_class = type.GetCustomAttributes (typeof (StaticAttribute), true).Length > 0 || is_category_class;
 			bool is_model = type.GetCustomAttributes (typeof (ModelAttribute), true).Length > 0;
+			bool is_protocol = HasAttribute (type, typeof (ProtocolAttribute));
 			var default_ctor_visibility = GetAttribute<DefaultCtorVisibilityAttribute> (type);
 			object [] btype = type.GetCustomAttributes (typeof (BaseTypeAttribute), true);
 			BaseTypeAttribute bta = btype.Length > 0 ? ((BaseTypeAttribute) btype [0]) : null;
@@ -3110,6 +3111,8 @@ public class Generator {
 				base_type = typeof (object);
 				class_mod = "static ";
 			} else {
+				if (is_protocol)
+					print ("[Protocol]");
 				print ("[Register(\"{0}\", {1})]", objc_type_name, IsWrapperType (type) ? "true" : "false");
 				if (need_abstract.ContainsKey (type))
 					class_mod = "abstract ";
