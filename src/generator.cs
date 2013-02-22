@@ -207,10 +207,6 @@ public class IsWrapperTypeAttribute : Attribute {
 	public bool IsWrapperType { get; set; }
 }
 
-// Used to mark if a type is wrapping a protocol
-public class ProtocolAttribute : Attribute {
-}
-
 public class NeedsAuditAttribute : Attribute {
 	public NeedsAuditAttribute (string reason)
 	{
