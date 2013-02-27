@@ -53,7 +53,7 @@ namespace TouchUnit.Bindings {
 		{
 			return false;
 		}
-		
+
 		protected virtual bool CheckResponse (bool value, Type actualType, Type declaredType, ref string name)
 		{
 			if (value)
@@ -74,24 +74,24 @@ namespace TouchUnit.Bindings {
 				if (t.IsNested || !NSObjectType.IsAssignableFrom (t))
 					continue;
 
-				if (Skip (t))
+				if (Skip (t) || SkipDueToAttribute (t))
 					continue;
 				
 				FieldInfo fi = t.GetField ("class_ptr", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
 				if (fi == null)
 					continue; // e.g. *Delegate
 				IntPtr class_ptr = (IntPtr) fi.GetValue (null);
-				
+
 				foreach (var m in t.GetMethods (BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)) {
 					
-					if (m.DeclaringType != t)
+					if (m.DeclaringType != t || SkipDueToAttribute (m))
 						continue;
-					
+
 					foreach (object ca in m.GetCustomAttributes (true)) {
 						ExportAttribute export = (ca as ExportAttribute);
 						if (export == null)
 							continue;
-						
+
 						string name = export.Selector;
 						if (Skip (t, name))
 							continue;
@@ -139,7 +139,7 @@ namespace TouchUnit.Bindings {
 				if (t.IsNested || !NSObjectType.IsAssignableFrom (t))
 					continue;
 
-				if (Skip (t))
+				if (Skip (t) || SkipDueToAttribute (t))
 					continue;
 
 				FieldInfo fi = t.GetField ("class_ptr", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
@@ -148,6 +148,9 @@ namespace TouchUnit.Bindings {
 				IntPtr class_ptr = (IntPtr) fi.GetValue (null);
 				
 				foreach (var m in t.GetMethods (BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static)) {
+					if (SkipDueToAttribute (m))
+						continue;
+
 					foreach (object ca in m.GetCustomAttributes (true)) {
 						if (ca is ExportAttribute) {
 							string name = (ca as ExportAttribute).Selector;
@@ -196,12 +199,15 @@ namespace TouchUnit.Bindings {
 				
 				foreach (var p in t.GetProperties (BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static | BindingFlags.Instance)) {
 					
-					if (p.DeclaringType != t)
+					if (p.DeclaringType != t || SkipDueToAttribute (p))
 						continue;
 
 					var mg = p.GetGetMethod ();
 					var ms = p.GetSetMethod ();
 					if (HasNoSetter (p) || (mg == null) || (ms != null))
+						continue;
+
+					if (SkipDueToAttribute (mg) || SkipDueToAttribute (ms))
 						continue;
 
 					foreach (object ca in mg.GetCustomAttributes (true)) {

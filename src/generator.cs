@@ -1672,7 +1672,7 @@ public class Generator {
 					} else if (attr is NoDefaultValueAttribute) {
 						seenNoDefaultValue = true;
 						continue;
-					} else if (attr is SealedAttribute || attr is EventArgsAttribute || attr is DelegateNameAttribute || attr is EventNameAttribute || attr is ObsoleteAttribute || attr is AlphaAttribute || attr is NewAttribute || attr is SinceAttribute || attr is PostGetAttribute || attr is NullAllowedAttribute || attr is CheckDisposedAttribute || attr is SnippetAttribute || attr is LionAttribute || attr is AppearanceAttribute || attr is ThreadSafeAttribute || attr is AutoreleaseAttribute || attr is EditorBrowsableAttribute || attr is AdviceAttribute)
+					} else if (attr is SealedAttribute || attr is EventArgsAttribute || attr is DelegateNameAttribute || attr is EventNameAttribute || attr is ObsoleteAttribute || attr is AlphaAttribute || attr is NewAttribute || attr is SinceAttribute || attr is PostGetAttribute || attr is NullAllowedAttribute || attr is CheckDisposedAttribute || attr is SnippetAttribute || attr is LionAttribute || attr is MountainLionAttribute || attr is AppearanceAttribute || attr is ThreadSafeAttribute || attr is AutoreleaseAttribute || attr is EditorBrowsableAttribute || attr is AdviceAttribute)
 						continue;
 					else if (attr is MarshalNativeExceptionsAttribute)
 						continue;
@@ -1922,7 +1922,16 @@ public class Generator {
 		foreach (var a in e)
 			w.WriteLine (a);
 	}
-	
+
+	public void PrintPlatformAttributes (MemberInfo mi)
+	{
+		if (mi == null)
+			return;
+
+		if (mi.GetCustomAttributes (typeof (MountainLionAttribute), false).Length > 0)
+			print ("[MountainLion]");
+	}
+
 	public string SelectorField (string s, bool ignore_inline_directive = false)
 	{
 		string name;
@@ -1952,6 +1961,8 @@ public class Generator {
 		// See http://bugzilla.xamarin.com/show_bug.cgi?id=2626
 		if (up)
 			sb.Append ('_');
+		if (!InlineSelectors)
+			sb.Append ("Handle");
 		name = sb.ToString ();
 		selector_names [s] = name;
 		return name;
@@ -2696,12 +2707,14 @@ public class Generator {
 			var targ = da.Type != null ? string.Format (", Type = \"{0}\"", da.Type) : string.Empty;
 			print ("[DebuggerDisplay (\"{0}\"{1}{2})]", da.Value, narg, targ);
 		}
+
+		PrintPlatformAttributes (pi);
+
 		foreach (SinceAttribute sa in pi.GetCustomAttributes (typeof (SinceAttribute), false)) 
 			print ("[Since ({0},{1})]", sa.Major, sa.Minor);
 
 		foreach (ThreadSafeAttribute sa in pi.GetCustomAttributes (typeof (ThreadSafeAttribute), false)) 
 			print ("[ThreadSafe]");
-
 	}
 
 	void GenerateProperty (Type type, PropertyInfo pi, List<string> instance_fields_to_clear_on_dispose, bool is_model)
@@ -2739,6 +2752,7 @@ public class Generator {
 			       pi.Name);
 			indent++;
 			if (pi.CanRead) {
+				PrintPlatformAttributes (pi);
 				print ("get {");
 				indent++;
 
@@ -2752,6 +2766,7 @@ public class Generator {
 				print ("}");
 			}
 			if (pi.CanWrite) {
+				PrintPlatformAttributes (pi);
 				print ("set {");
 				indent++;
 
@@ -2805,10 +2820,14 @@ public class Generator {
 		indent++;
 
 		if (wrap != null) {
-			if (pi.CanRead)
+			if (pi.CanRead) {
+				PrintPlatformAttributes (pi);
 				print ("get {{ return {0} as {1}; }}", wrap, FormatType (pi.DeclaringType, pi.PropertyType));
-			if (pi.CanWrite)
+			}
+			if (pi.CanWrite) {
+				PrintPlatformAttributes (pi);
 				print ("set {{ {0} = value; }}", wrap);
+			}
 			indent--;
 			print ("}\n");
 			return;			
@@ -2820,12 +2839,15 @@ public class Generator {
 			var ba = GetBindAttribute (getter);
 			string sel = ba != null ? ba.Selector : export.Selector;
 
+			PrintPlatformAttributes (pi);
+
 			if (!is_sealed || !is_wrapper) {
 				if (export.ArgumentSemantic != ArgumentSemantic.None)
 					print ("[Export (\"{0}\", ArgumentSemantic.{1})]", sel, export.ArgumentSemantic);
 				else
 					print ("[Export (\"{0}\")]", sel);
 			}
+
 			if (is_abstract){
 				print ("get; ");
 			} else {
@@ -2862,6 +2884,8 @@ public class Generator {
 			} else {
 				sel = ba.Selector;
 			}
+
+			PrintPlatformAttributes (pi);
 
 			if (!not_implemented && (!is_sealed || !is_wrapper)){
 				if (export.ArgumentSemantic != ArgumentSemantic.None)
@@ -2955,6 +2979,8 @@ public class Generator {
 				print ("[EditorBrowsable (EditorBrowsableState.{0})]", ea.State);
 			}
 		}
+
+		PrintPlatformAttributes (mi);
 
 		bool is_static = HasAttribute (mi, typeof (StaticAttribute));
 		if (is_static || category_extension_type != null)
@@ -3120,6 +3146,8 @@ public class Generator {
 				print ("[Model]");
 			}
 
+			PrintPlatformAttributes (type);
+
 			print ("public unsafe {0}partial class {1} {2} {{",
 			       class_mod,
 			       TypeName,
@@ -3129,12 +3157,13 @@ public class Generator {
 			
 			if (!is_model){
 				foreach (var ea in selectors [type]){
+					var selectorField = SelectorField (ea, true);
+					if (!InlineSelectors)
+						selectorField = selectorField.Substring (0, selectorField.Length - 6 /* Handle */);
 					print ("[CompilerGenerated]");
-					if (InlineSelectors) {
-						print ("const string {0} = \"{1}\";", SelectorField (ea, true), ea);
-					} else {
+					print ("const string {0} = \"{1}\";", selectorField, ea);
+					if (!InlineSelectors)
 						print ("static readonly IntPtr {0} = Selector.GetHandle (\"{1}\");", SelectorField (ea), ea);
-					}
 				}
 			}
 			print ("");
@@ -3179,12 +3208,20 @@ public class Generator {
 				}
 				
 				if (TypeName != "NSObject"){
+					var initSelector = InlineSelectors ? "Selector.GetHandle (\"init\")" : "Selector.Init";
+					var initWithCoderSelector = InlineSelectors ? "Selector.GetHandle (\"initWithCoder:\")" : "Selector.InitWithCoder";
 					if (external) {
 						if (!disable_default_ctor) {
 							GeneratedCode (sw, 2);
 							sw.WriteLine ("\t\t[EditorBrowsable (EditorBrowsableState.Advanced)]");
-							sw.WriteLine ("\t\t[Export (\"init\")]\n\t\t{3} {0} () : base (NSObjectFlag.Empty)\n\t\t{{\n\t\t\t{1}Handle = {2}.ObjCRuntime.Messaging.IntPtr_objc_msgSend (this.Handle, Selector.GetHandle (\"init\"));\n\t\t\t\n\t\t}}\n",
-							      TypeName, debug ? String.Format ("Console.WriteLine (\"{0}.ctor ()\");", TypeName) : "", MainPrefix, ctor_visibility);
+							sw.WriteLine ("\t\t[Export (\"init\")]");
+							sw.WriteLine ("\t\t{1} {0} () : base (NSObjectFlag.Empty)", TypeName, ctor_visibility);
+							sw.WriteLine ("\t\t{");
+							if (debug)
+								sw.WriteLine ("\t\t\tConsole.WriteLine (\"{0}.ctor ()\");", TypeName);
+							sw.WriteLine ("\t\t\tHandle = " + MainPrefix + ".ObjCRuntime.Messaging.IntPtr_objc_msgSend (this.Handle, {0});", initSelector);
+							sw.WriteLine ("\t\t\t");
+							sw.WriteLine ("\t\t}");
 						}
 					} else {
 						if (!disable_default_ctor) {
@@ -3198,9 +3235,9 @@ public class Generator {
 							if (debug)
 								sw.WriteLine ("\t\t\tConsole.WriteLine (\"{0}.ctor ()\");", TypeName);
 							sw.WriteLine ("\t\t\tif (IsDirectBinding) {");
-							sw.WriteLine ("\t\t\t\tHandle = " + MainPrefix + ".ObjCRuntime.Messaging.IntPtr_objc_msgSend (this.Handle, Selector.GetHandle (\"init\"));");
+							sw.WriteLine ("\t\t\t\tHandle = " + MainPrefix + ".ObjCRuntime.Messaging.IntPtr_objc_msgSend (this.Handle, {0});", initSelector);
 							sw.WriteLine ("\t\t\t} else {");
-							sw.WriteLine ("\t\t\t\tHandle = " + MainPrefix + ".ObjCRuntime.Messaging.IntPtr_objc_msgSendSuper (this.SuperHandle, Selector.GetHandle (\"init\"));");
+							sw.WriteLine ("\t\t\t\tHandle = " + MainPrefix + ".ObjCRuntime.Messaging.IntPtr_objc_msgSendSuper (this.SuperHandle, {0});", initSelector);
 							sw.WriteLine ("\t\t\t}");
 							sw.WriteLine ("\t\t}");
 							sw.WriteLine ();
@@ -3215,9 +3252,9 @@ public class Generator {
 						if (debug)
 							sw.WriteLine ("\t\t\tConsole.WriteLine (\"{0}.ctor (NSCoder)\");", TypeName);
 						sw.WriteLine ("\t\t\tif (IsDirectBinding) {");
-						sw.WriteLine ("\t\t\t\tHandle = " + MainPrefix + ".ObjCRuntime.Messaging.IntPtr_objc_msgSend_IntPtr (this.Handle, Selector.GetHandle (\"initWithCoder:\"), coder.Handle);");
+						sw.WriteLine ("\t\t\t\tHandle = " + MainPrefix + ".ObjCRuntime.Messaging.IntPtr_objc_msgSend_IntPtr (this.Handle, {0}, coder.Handle);", initWithCoderSelector);
 						sw.WriteLine ("\t\t\t} else {");
-						sw.WriteLine ("\t\t\t\tHandle = " + MainPrefix + ".ObjCRuntime.Messaging.IntPtr_objc_msgSendSuper_IntPtr (this.SuperHandle, Selector.GetHandle (\"initWithCoder:\"), coder.Handle);");
+						sw.WriteLine ("\t\t\t\tHandle = " + MainPrefix + ".ObjCRuntime.Messaging.IntPtr_objc_msgSendSuper_IntPtr (this.SuperHandle, {0}, coder.Handle);", initWithCoderSelector);
 						sw.WriteLine ("\t\t\t}");
 						sw.WriteLine ("\t\t}");
 						sw.WriteLine ();
@@ -3325,8 +3362,11 @@ public class Generator {
 						print ("static {0} _{1};", fieldTypeName, field_pi.Name);
 					}
 
+					PrintPlatformAttributes (field_pi);
 					print ("{0} static {1} {2} {{", HasAttribute (field_pi, typeof (InternalAttribute)) ? "internal" : "public", fieldTypeName, field_pi.Name);
 					indent++;
+
+					PrintPlatformAttributes (field_pi);
 					print ("get {");
 					indent++;
 					if (field_pi.PropertyType == typeof (NSString)){
@@ -3364,6 +3404,7 @@ public class Generator {
 					print ("}");
 
 					if (field_pi.CanWrite) {
+						PrintPlatformAttributes (field_pi);
 						print ("set {");
 						indent++;
 						if (field_pi.PropertyType == typeof (int)) {
@@ -3560,11 +3601,12 @@ public class Generator {
 
 					if (noDefaultValue.Count > 0) {
 						string selRespondsToSelector = "Selector.GetHandle (\"respondsToSelector:\")";
+
 						if (!InlineSelectors) {
 							foreach (var mi in noDefaultValue) {
 								var eattrs = mi.GetCustomAttributes (typeof (ExportAttribute), false);
 								var export = (ExportAttribute)eattrs[0];
-								print ("static IntPtr sel{0} = Selector.GetHandle (\"{1}\");", mi.Name, export.Selector);
+								print ("static IntPtr sel{0}Handle = Selector.GetHandle (\"{1}\");", mi.Name, export.Selector);
 							}
 							print ("static IntPtr selRespondsToSelector = " + selRespondsToSelector + ";");
 							selRespondsToSelector = "selRespondsToSelector";
@@ -3580,7 +3622,7 @@ public class Generator {
 								var export = (ExportAttribute)eattrs[0];
 								print ("if (selHandle.Equals (Selector.GetHandle (\"{0}\")))", export.Selector);
 							} else {
-								print ("if (selHandle.Equals (sel{0}))", mi.Name);
+								print ("if (selHandle.Equals (sel{0}Handle))", mi.Name);
 							}
 							++indent;
 							print ("return {0} != null;", PascalCase (mi.Name));
