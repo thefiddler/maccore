@@ -2959,7 +2959,8 @@ public class Generator {
 			selector = ea.Selector;
 					
 			if (!is_sealed || !is_wrapper) {
-				print ("[Export (\"{0}\")]", ea.Selector);
+				var is_variadic = ea.IsVariadic ? ", IsVariadic = true" : string.Empty;
+				print ("[Export (\"{0}\"{1})]", ea.Selector, is_variadic);
 				virtual_method = mi.Name != "Constructor";
 			}
 		}
