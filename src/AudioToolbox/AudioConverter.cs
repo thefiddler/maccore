@@ -506,11 +506,11 @@ namespace MonoMac.AudioToolbox
 				data = null;
 			}
 
-            var handler = GCHandle.FromIntPtr (inUserData);
-            var inst = (AudioConverter) handler.Target;
+			var handler = GCHandle.FromIntPtr (inUserData);
+			var inst = (AudioConverter) handler.Target;
 
-            // evoke event handler with an argument
-            if (inst.InputData == null)
+			// evoke event handler with an argument
+			if (inst.InputData == null)
 				throw new ArgumentNullException ("InputData");
 
 			var res = inst.InputData (ref ioNumberDataPackets, new AudioBuffers (ioData), ref data);
@@ -581,15 +581,19 @@ namespace MonoMac.AudioToolbox
 				return null;
 
 			var data = new T[size / elementSize];
-			fixed (T* ptr = &data[0]) {
-				var res = AudioConverterGetProperty (handle, prop, ref size, (IntPtr)ptr);
+			var data_handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+			try {
+				var res = AudioConverterGetProperty (handle, prop, ref size, data_handle.AddrOfPinnedObject());
 				if (res != 0)
 					return null;
 
 				Array.Resize (ref data, size / elementSize);
 				return data;
 			}
-		}		
+			finally {
+				data_handle.Free();
+			}
+		}
 
 		void SetProperty (AudioConverterPropertyID propertyID, uint value)
 		{
@@ -613,7 +617,7 @@ namespace MonoMac.AudioToolbox
 		}
 
 		[DllImport (MonoMac.Constants.AudioToolboxLibrary)]
-        static extern AudioConverterError AudioConverterNew (ref AudioStreamBasicDescription inSourceFormat, ref AudioStreamBasicDescription inDestinationFormat, ref IntPtr outAudioConverter);		
+		static extern AudioConverterError AudioConverterNew (ref AudioStreamBasicDescription inSourceFormat, ref AudioStreamBasicDescription inDestinationFormat, ref IntPtr outAudioConverter);		
 
 		[DllImport (MonoMac.Constants.AudioToolboxLibrary)]	
 		static extern AudioConverterError AudioConverterNewSpecific (ref AudioStreamBasicDescription inSourceFormat, ref AudioStreamBasicDescription inDestinationFormat,
@@ -696,11 +700,11 @@ namespace MonoMac.AudioToolbox
 		CalculateOutputBufferSize		= 0x636f6273, // 'cobs'
 		
 		// TODO: Format specific
-		// InputCodecParameters         = 'icdp'
-		// OutputCodecParameters        = 'ocdp'
+		// InputCodecParameters		 = 'icdp'
+		// OutputCodecParameters		= 'ocdp'
 
 		// Deprecated
-    	// SampleRateConverterAlgorithm = 'srci'
+		// SampleRateConverterAlgorithm = 'srci'
 		SampleRateConverterComplexity	= 0x73726361, // 'srca'
 		SampleRateConverterQuality		= 0x73726371, // 'srcq'
 		SampleRateConverterInitialPhase = 0x73726370, // 'srcp'

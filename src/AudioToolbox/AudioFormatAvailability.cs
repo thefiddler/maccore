@@ -62,13 +62,17 @@ namespace MonoMac.AudioToolbox {
 				return null;
 
 			var data = new T[size / Marshal.SizeOf (typeof (T))];
-			fixed (T* ptr = data) {
-				var res = AudioFormatPropertyNative.AudioFormatGetProperty (prop, sizeof (AudioFormatType), ref format, ref size, (IntPtr)ptr);
+			var data_handle = GCHandle.Alloc(data, GCHandleType.Pinned);
+			try {
+				var res = AudioFormatPropertyNative.AudioFormatGetProperty (prop, sizeof (AudioFormatType), ref format, ref size, data_handle.AddrOfPinnedObject());
 				if (res != 0)
 					return null;
 
 				Array.Resize (ref data, (int) size / Marshal.SizeOf (typeof (T)));
 				return data;
+			}
+			finally {
+				data_handle.Free();
 			}
 		}
 	}
